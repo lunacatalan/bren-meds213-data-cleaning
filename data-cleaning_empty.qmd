@@ -67,10 +67,9 @@ snowsurvey_csv %>%
 Interestingly, when there is a "dot" for snow cover, it is also the case for all the other covers. Let's replace them all with NA since there is no supplemental information in the provided metadata
 
 ```{r}
-snowsurvey_fixed <- snowsurvey_csv %>% 
-  filter(Snow_cover == ".") %>% 
+snowsurvey_fixed <- snowsurvey_csv %>%
   mutate(Snow_cover = ifelse(Snow_cover == ".",
-                "NA",
+                NA,
                 Snow_cover))
 ```
 
@@ -80,9 +79,9 @@ The problem is similar with "-", let's set it to NA
 
 ```{r}
 
-snowsurvey_fixed <- snowsurvey_csv %>%
+snowsurvey_fixed <- snowsurvey_fixed %>%
   mutate(Snow_cover = ifelse(Snow_cover == "-",
-                "NA",
+                NA,
                 Snow_cover))
 
 ```
@@ -91,10 +90,9 @@ snowsurvey_fixed <- snowsurvey_csv %>%
 
 ```{r}
 
-snowsurvey_fixed <- snowsurvey_csv %>% 
-  filter(Snow_cover == "n/a") %>% 
+snowsurvey_fixed <- snowsurvey_fixed %>%
   mutate(Snow_cover = ifelse(Snow_cover == "n/a",
-                "NA",
+                NA,
                 Snow_cover))
 
 ```
@@ -103,7 +101,10 @@ snowsurvey_fixed <- snowsurvey_csv %>%
 
 ```{r}
 
-
+snowsurvey_fixed <- snowsurvey_fixed %>%  
+  mutate(Snow_cover = ifelse(Snow_cover == "unk",
+                NA,
+                Snow_cover))
 
 ```
 
@@ -111,8 +112,7 @@ Finally we will set "<1" as zero (quite arbitrary indeed):
 
 ```{r}
 
-snowsurvey_fixed <- snowsurvey_csv %>% 
-  filter(Snow_cover == "<1") %>% 
+snowsurvey_fixed <- snowsurvey_fixed %>%
   mutate(Snow_cover = ifelse(Snow_cover == "<1",
                 0,
                 Snow_cover))
@@ -123,23 +123,40 @@ Now we can test if we now only have NAs as non numeric values in the column:
 
 ```{r}
 
+snowsurvey_fixed %>% 
+  count(Snow_cover) %>% 
+  filter(is.na(as.numeric(Snow_cover)))
+
 ```
 
 Ok, we can do the transformation:
 
 ```{r}
 
+snowsurvey_fixed <- snowsurvey_fixed %>% 
+  mutate(Snow_cover = as.numeric(Snow_cover))
+
+glimpse(snowsurvey_fixed)
+
 ```
 
 Yeah we have finally a numeric column 🎉. Now we can verify that all the values are between 0 and 100:
 
 ```{r}
+
+snowsurvey_fixed %>% 
+  filter(Snow_cover > 100)
  
 ```
 
 We have two values above 100, with an interesting 470%! ☃️ We should probably set those values to NAs:
 
 ```{r}
+
+snowsurvey_fixed <- snowsurvey_fixed %>% 
+  mutate(Snow_cover = ifelse(Snow_cover > 100,
+         NA,
+         Snow_cover))
 
 ```
 
@@ -168,6 +185,8 @@ Import the species csv files with the bird species information:
 
 ```{r}
 
+species_csv <- read_csv(file.path(datadir_raw, species_file))
+
 ```
 
 This data set is stored in a wide format where each specie has its own column. This means that every time we discover a new species we will have to add a column. In addition, a bunch of `0` are stored in this table but do not really provide any information. According to the metadata:
@@ -183,16 +202,26 @@ This data model is not convenient for a database, we will have to switch to a lo
 
 ```{r}
 
+species_long <- species_csv %>% 
+  pivot_longer(
+    
+    cols = !c(1:7),
+    names_to = "species",
+    values_to = "species_count",
+    values_transform = list(species_count = as.character) # transform the column species_count
+  )
+
 ```
 
-
-```{r}
-
-```
 
 We want to focus on the presence and absence of species and not the count. Let's create a new column for presence where anything else than 0 is considered present
 
 ```{r}
+
+species_presence <- species_long %>% 
+  mutate(presence = ifelse(species_count == 0, 
+                           0, 
+                           1))
 
 ```
 
@@ -200,12 +229,18 @@ We can remove some columns: "Num_observers", "All_obs_reported", "Observer_hours
 
 ```{r}
 
+species_presence <- species_presence %>% 
+  select(!c("Num_observers", "All_obs_reported", "Observer_hours"))
+
 ```
 
 Last but not least, let's have a look at our species list
 
 ```{r}
-
+species_presence %>% 
+  filter(presence == 1) %>% 
+  count(species) %>% 
+  arrange(desc(n))
 ```
 
 We have 319 species observed in this table. The "convention" seems to be that `_` are used to separate the different parts of a name. Note that it is not clear what type of nomenclature reference is used to pull those names from.
