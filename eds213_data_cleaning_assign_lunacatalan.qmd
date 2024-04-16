@@ -68,6 +68,11 @@ snow_cover <- read_csv('/Users/lunacatalan/Documents/dev/eds213/bren-meds213-dat
   mutate(Date = Date2) %>% 
   select(-Date2)
 
+# snow_cover %>% 
+#   count(Land_cover) %>% 
+#   filter(is.na(as.numeric(Land_cover)))
+
+
 # replace unknown and n/a values with NA's
 clean_cover <- snow_cover %>% 
   mutate(Water_cover = ifelse(Water_cover == "unk", 
@@ -96,16 +101,24 @@ Use the relationship between the three cover columns (Snow, Water, Land) to infe
 ```{r}
 
 total_check <- clean_cover %>% 
-  mutate(Snow_cover = ifelse(Total_cover == Water_cover + Land_cover,
+  mutate(Snow_cover = ifelse(Total_cover == (Water_cover + Land_cover),
                                     0,
                                     Snow_cover),
          Total_cover = ifelse(Snow_cover == 0 & Water_cover == 0 & Land_cover == 0,
-                              0,
+                              NA, # make NA because there were no valid observations
                               Total_cover)) %>% 
   mutate(total_cover_check = ifelse(Total_cover == (Snow_cover + Water_cover + Land_cover),
                               Total_cover, 
                               NA)) %>% 
   filter(is.na(total_cover_check))
+
+# check the number of observations where there are 0 for everything, and no observer
+observer_check <- total_check %>% 
+  filter(is.na(Observer))
+
+# check the number of rows where all values equal 0
+empty_check <- total_check %>% 
+  filter(Snow_cover == 0 & Water_cover == 0 & Land_cover == 0)
 
 clean_cover <- clean_cover %>% 
   filter(!id %in% total_check$id) # remove the rows that match the ones above
