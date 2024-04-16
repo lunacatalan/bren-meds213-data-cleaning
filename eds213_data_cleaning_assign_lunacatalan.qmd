@@ -1,0 +1,115 @@
+---
+title: "Data Analaysis with the Arctic shorebird csv files"
+format: html
+---
+
+
+```{r, message=FALSE}
+library(tidyverse)
+library(lubridate)
+library(RColorBrewer)
+```
+
+## Define path and filenames
+
+```{r message=FALSE, warning = FALSE}
+path_raw <- "data/raw_analysis"
+
+sites_csv <- "site.csv"
+
+snowcover_csv <- "snow_cover.csv"
+
+nests_csv <- "ASDN_Bird_nests.csv"
+
+eggs_csv <- "ASDN_Bird_eggs.csv"
+
+species_csv <- "species.csv"
+
+lemmings_csv <- "ASDN_Daily_pred_lemm.csv"
+
+snowcover_data <- read_csv(file.path(path_raw, snowcover_csv))
+
+# transform the date in date format
+snowcover_data_fixed <- snowcover_data %>% 
+  mutate(Date2 = as_date(Date)) 
+
+# snowcover_data_fixed %>% 
+#   filter(is.na(Date2)) %>% 
+#   View()
+
+snowcover_data_fixed <- snowcover_data_fixed %>% 
+  mutate(Date = case_when(
+    Date == "8&9 june 06" ~ "09-June-06",
+    .default = Date
+  )) %>% 
+  mutate(Date2 = as_date(Date))
+
+snowcover_data_fixed <- snowcover_data_fixed %>% 
+  mutate(Date = case_when(
+    Date == "8&9 june 06" ~ "09-June-06",
+    .default = Date
+  )) %>% 
+  mutate(Date2 = as_date(Date, 
+                         format = "%d-%b-%y")) # tell the funciton how to read the date from Date columns
+
+#write.csv(snowcover_data_fixed, '/Users/lunacatalan/Documents/dev/eds213/bren-meds213-data-cleaning/data/processed/snow_cover.csv')
+
+```
+
+# Data Cleaning 
+
+1. Clean the `Water_cover` column to transform it into the correct data type and respect expectations for a percentage
+
+2. Clean the `Land_cover` column to transform it into the correct data type and respect expectations for a percentage
+
+```{r message=FALSE, warning = FALSE}
+
+snow_cover <- read_csv('/Users/lunacatalan/Documents/dev/eds213/bren-meds213-data-cleaning/data/processed/snow_cover.csv') %>% 
+  mutate(Date = Date2) %>% 
+  select(-Date2)
+
+# replace unknown and n/a values with NA's
+clean_cover <- snow_cover %>% 
+  mutate(Water_cover = ifelse(Water_cover == "unk", 
+                              NA,
+                              ifelse(Water_cover == "n/a",
+                                     NA,
+                                     Water_cover)),
+         Land_cover = ifelse(Water_cover == "unk", 
+                              NA,
+                              ifelse(Land_cover == "n/a",
+                                     NA,
+                                     Land_cover))) %>% 
+  mutate(Water_cover = as.numeric(Water_cover),
+         Land_cover = as.numeric(Land_cover)) %>% 
+  
+  # remove the negative numbers - don't want to assume 100% water cover
+  filter(Land_cover >= 0) %>% 
+  mutate(id = `...1`) %>% 
+  select(!`...1`)
+  
+  
+```
+
+Use the relationship between the three cover columns (Snow, Water, Land) to infer missing values where possible and recompute the Total_cover column
+
+```{r}
+
+total_check <- clean_cover %>% 
+  mutate(Snow_cover = ifelse(Total_cover == Water_cover + Land_cover,
+                                    0,
+                                    Snow_cover),
+         Total_cover = ifelse(Snow_cover == 0 & Water_cover == 0 & Land_cover == 0,
+                              0,
+                              Total_cover)) %>% 
+  mutate(total_cover_check = ifelse(Total_cover == (Snow_cover + Water_cover + Land_cover),
+                              Total_cover, 
+                              NA)) %>% 
+  filter(is.na(total_cover_check))
+
+clean_cover <- clean_cover %>% 
+  filter(!id %in% total_check$id) # remove the rows that match the ones above
+
+```
+
+
