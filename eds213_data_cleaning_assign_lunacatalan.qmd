@@ -12,6 +12,8 @@ library(RColorBrewer)
 
 ## Define path and filenames
 
+Link to github: https://github.com/lunacatalan/bren-meds213-data-cleaning
+
 ```{r message=FALSE, warning = FALSE}
 path_raw <- "data/raw_analysis"
 
