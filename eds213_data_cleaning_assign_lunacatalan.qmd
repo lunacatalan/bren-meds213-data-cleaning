@@ -39,7 +39,7 @@ snowcover_data_fixed <- snowcover_data %>%
 
 snowcover_data_fixed <- snowcover_data_fixed %>% 
   mutate(Date = case_when(
-    Date == "8&9 june 06" ~ "09-June-06",
+    Date == "8&9 june 06" ~ "09-June-06", # update the date columns
     .default = Date
   )) %>% 
   mutate(Date2 = as_date(Date))
@@ -75,6 +75,8 @@ snow_cover <- read_csv('/Users/lunacatalan/Documents/dev/eds213/bren-meds213-dat
 
 # replace unknown and n/a values with NA's
 clean_cover <- snow_cover %>% 
+  
+  # replace these values with NA
   mutate(Water_cover = ifelse(Water_cover == "unk", 
                               NA,
                               ifelse(Water_cover == "n/a",
@@ -98,20 +100,36 @@ clean_cover <- snow_cover %>%
 
 Use the relationship between the three cover columns (Snow, Water, Land) to infer missing values where possible and recompute the Total_cover column
 
-```{r}
+Create a dataframe that filters for the NA values in a total_check column
+- if the snow, water, and land cover do not add up to total cover then set it to NA
+- if they add together keep the values (which should be 100)
 
+```{r warning=FALSE, message=FALSE}
 total_check <- clean_cover %>% 
+  
+  #  if total_cover is equal to water + land then set to 0 since the math adds up
   mutate(Snow_cover = ifelse(Total_cover == (Water_cover + Land_cover),
                                     0,
                                     Snow_cover),
+         
+         # if all the columns equal 0, then set total cover to NA since there were no observations
          Total_cover = ifelse(Snow_cover == 0 & Water_cover == 0 & Land_cover == 0,
                               NA, # make NA because there were no valid observations
                               Total_cover)) %>% 
+  
+  # make a check column so that if the columns dont add up to total cover set the cover check to NA
   mutate(total_cover_check = ifelse(Total_cover == (Snow_cover + Water_cover + Land_cover),
                               Total_cover, 
                               NA)) %>% 
   filter(is.na(total_cover_check))
+```
 
+Check the NAs in 
+- There are 622 rows where the NA values in total_check dont have observers...because of this I feel okay dropping the rows
+- The total number of rows where snow, water, and land are empty is 1514...because of this I feel okay dropping these values
+- This only leaves 10 rows where values seem to be mis-entered
+- Because of these checks, I feel okay dropping all of the rows in the total_check dataframe from the `clean_cover`
+```{r warning=FALSE, message=FALSE}
 # check the number of observations where there are 0 for everything, and no observer
 observer_check <- total_check %>% 
   filter(is.na(Observer))
@@ -123,6 +141,7 @@ empty_check <- total_check %>%
 clean_cover <- clean_cover %>% 
   filter(!id %in% total_check$id) # remove the rows that match the ones above
 
+# write.csv(clean_cover, '/Users/lunacatalan/Documents/dev/eds213/bren-meds213-data-cleaning/data/processed/clean_cover.csv')
 ```
 
 
